@@ -64,7 +64,11 @@ function configurar() {
   props.setProperties({
     PLANILHA_ID: planilha.getId(),
     PASTA_RECEBIDAS_ID: recebidas.getId(),
-    SEGREDO: Utilities.getUuid() + Utilities.getUuid().replace(/-/g, ""),
+    // Segredo.gs fica só no projeto do Apps Script (está no .gitignore); sem ele, gera um novo.
+    SEGREDO:
+      typeof SEGREDO_VERCEL !== "undefined"
+        ? SEGREDO_VERCEL
+        : Utilities.getUuid() + Utilities.getUuid().replace(/-/g, ""),
     ULTIMO_PROTOCOLO: "0",
     EMAIL_AVISO: Session.getEffectiveUser().getEmail(),
   });

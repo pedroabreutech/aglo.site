@@ -7,3 +7,5 @@ next-env.d.ts
 .vercel
 .env
 .env*.local
+.clasp.json
+apps-script/Segredo.gs
