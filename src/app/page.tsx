@@ -29,7 +29,7 @@ const dicas = [
   "Use a foto ou o vídeo original, na melhor qualidade disponível.",
   "Registros feitos do alto (drone, prédio, palco) funcionam melhor.",
   "Evite árvores, toldos ou sombras cobrindo as pessoas.",
-  "Envie um arquivo por vez. Vídeos podem ter até 100 MB.",
+  "Envie um arquivo por vez.",
 ];
 
 export default function Home() {
