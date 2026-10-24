@@ -3,13 +3,14 @@ import { EnvioForm } from "@/components/EnvioForm";
 import { HeroIlustracao } from "@/components/HeroIlustracao";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { TrabalhosCarousel } from "@/components/TrabalhosCarousel";
 import { site } from "@/lib/site";
 
 const passos = [
   {
     icone: Camera,
-    titulo: "Envie sua foto",
-    texto: "Informe seu e-mail e envie a foto da multidão. É gratuito.",
+    titulo: "Envie sua mídia",
+    texto: "Informe seu e-mail e envie uma foto ou um vídeo da multidão. É gratuito.",
   },
   {
     icone: ScanSearch,
@@ -20,15 +21,15 @@ const passos = [
   {
     icone: Mail,
     titulo: "Receba no e-mail",
-    texto: `Em ${site.prazoResposta}, você recebe a estimativa e a imagem com cada pessoa marcada.`,
+    texto: `Em ${site.prazoResposta}, você recebe a estimativa e o resultado visual da análise.`,
   },
 ];
 
 const dicas = [
-  "Use a foto original, na maior resolução que tiver.",
-  "Fotos tiradas do alto (drone, prédio, palco) funcionam melhor.",
+  "Use a foto ou o vídeo original, na melhor qualidade disponível.",
+  "Registros feitos do alto (drone, prédio, palco) funcionam melhor.",
   "Evite árvores, toldos ou sombras cobrindo as pessoas.",
-  "Uma foto por envio. Para várias fotos, envie uma de cada vez.",
+  "Envie um arquivo por vez. Vídeos podem ter até 100 MB.",
 ];
 
 export default function Home() {
@@ -43,18 +44,18 @@ export default function Home() {
               Contagem de multidões com IA
             </span>
             <h1 className="text-4xl font-bold leading-tight text-slate-900 md:text-5xl">
-              Quantas pessoas tem na sua foto?
+              Quantas pessoas aparecem na sua foto ou vídeo?
             </h1>
             <p className="text-lg text-slate-600">
-              Envie uma foto de multidão e receba no seu e-mail a contagem estimada, com cada pessoa
-              marcada na imagem. Sem custo.
+              Envie uma foto ou um vídeo de multidão e receba no seu e-mail a contagem estimada,
+              com o resultado visual da análise. Sem custo.
             </p>
             <div className="flex flex-wrap gap-3">
               <a
                 href="#enviar"
                 className="rounded-lg bg-[#137FEC] px-6 py-3 font-semibold text-white hover:bg-[#0F6FD1]"
               >
-                Enviar minha foto
+                Enviar meu arquivo
               </a>
               <a
                 href="#como-funciona"
@@ -88,10 +89,12 @@ export default function Home() {
           </div>
         </section>
 
+        <TrabalhosCarousel />
+
         <section id="enviar" className="mx-auto grid max-w-6xl scroll-mt-6 gap-8 px-5 py-14 lg:grid-cols-[1fr_320px]">
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Envie sua foto</h2>
+              <h2 className="text-2xl font-bold text-slate-900">Envie sua foto ou vídeo</h2>
               <p className="text-slate-600">
                 Campos com <span className="text-[#137FEC]">*</span> são obrigatórios.
               </p>
@@ -118,8 +121,8 @@ export default function Home() {
                 Sua privacidade
               </div>
               <p className="mt-3 text-sm text-slate-600">
-                Usamos seu e-mail só para enviar o resultado. A foto é apagada em até{" "}
-                {site.diasRetencaoFoto} dias após a resposta e só é publicada com a sua autorização.
+                Usamos seu e-mail só para enviar o resultado. O arquivo é apagado em até{" "}
+                {site.diasRetencaoFoto} dias após a resposta e só é publicado com a sua autorização.
               </p>
               <a href="/privacidade" className="mt-3 inline-block text-sm text-[#137FEC] hover:underline">
                 Ler a política de privacidade

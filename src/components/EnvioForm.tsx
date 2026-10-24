@@ -1,12 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
-import { CircleAlert, CircleCheck, ImagePlus, LoaderCircle, RefreshCw, Send } from "lucide-react";
-import { normalizarInstagram, validarPedido } from "@/lib/pedido";
+import {
+  CircleAlert,
+  CircleCheck,
+  FileUp,
+  FileVideo,
+  LoaderCircle,
+  RefreshCw,
+  Send,
+} from "lucide-react";
+import {
+  FORMATOS_VIDEO,
+  normalizarInstagram,
+  TAMANHO_MAXIMO_VIDEO,
+  validarPedido,
+  validarPedidoVideo,
+} from "@/lib/pedido";
 import { prepararImagem, TAMANHO_MAXIMO_ARQUIVO, type ImagemPreparada } from "@/lib/prepararImagem";
+import { prepararVideo, type VideoPreparado } from "@/lib/prepararVideo";
 import { site } from "@/lib/site";
 
 type Etapa = { tipo: "preenchendo" } | { tipo: "enviando" } | { tipo: "enviado"; protocolo: string };
+type Midia = ({ tipo: "imagem" } & ImagemPreparada) | ({ tipo: "video" } & VideoPreparado);
+
+const TAMANHO_PARTE_VIDEO = 2 * 1024 * 1024;
+const EXTENSOES_IMAGEM = ["jpg", "jpeg", "png", "webp"];
 
 const camposVazios = {
   nome: "",
@@ -21,7 +40,7 @@ const camposVazios = {
 type NomeCampo = keyof typeof camposVazios;
 
 const classeInput =
-  "w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#137FEC]/40 focus:border-[#137FEC]";
+  "w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#137FEC] focus:outline-none focus:ring-2 focus:ring-[#137FEC]/40";
 
 function Campo({
   rotulo,
@@ -58,13 +77,27 @@ function Secao({ titulo, descricao, children }: { titulo: string; descricao?: st
   );
 }
 
+function extensao(nome: string) {
+  return nome.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function tamanhoLegivel(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+}
+
+async function lerResposta(resposta: Response) {
+  return (await resposta.json().catch(() => null)) as { protocolo?: string; concluido?: boolean; erro?: string } | null;
+}
+
 export function EnvioForm() {
   const [campos, setCampos] = useState(camposVazios);
   const [autorizaAnalise, setAutorizaAnalise] = useState(false);
   const [autorizaPublicacao, setAutorizaPublicacao] = useState(false);
-  const [imagem, setImagem] = useState<ImagemPreparada | null>(null);
+  const [midia, setMidia] = useState<Midia | null>(null);
   const [nomeArquivo, setNomeArquivo] = useState("");
-  const [preparandoImagem, setPreparandoImagem] = useState(false);
+  const [tamanhoArquivo, setTamanhoArquivo] = useState(0);
+  const [preparandoMidia, setPreparandoMidia] = useState(false);
+  const [progressoEnvio, setProgressoEnvio] = useState(0);
   const [arrastando, setArrastando] = useState(false);
   const [erro, setErro] = useState("");
   const [etapa, setEtapa] = useState<Etapa>({ tipo: "preenchendo" });
@@ -72,9 +105,9 @@ export function EnvioForm() {
 
   useEffect(() => {
     return () => {
-      if (imagem) URL.revokeObjectURL(imagem.previewUrl);
+      if (midia) URL.revokeObjectURL(midia.previewUrl);
     };
-  }, [imagem]);
+  }, [midia]);
 
   function atualizar(campo: NomeCampo, valor: string) {
     setCampos((atuais) => ({ ...atuais, [campo]: valor }));
@@ -83,24 +116,35 @@ export function EnvioForm() {
   async function selecionarArquivo(arquivo: File | undefined) {
     if (!arquivo) return;
     setErro("");
+    const formato = extensao(arquivo.name);
+    const ehImagem = EXTENSOES_IMAGEM.includes(formato);
+    const ehVideo = FORMATOS_VIDEO.includes(formato as (typeof FORMATOS_VIDEO)[number]);
 
-    if (arquivo.type && !arquivo.type.startsWith("image/")) {
-      setErro("Selecione um arquivo de imagem (JPG, PNG ou WebP).");
+    if (!ehImagem && !ehVideo) {
+      setErro("Selecione uma foto JPG, PNG ou WebP, ou um vídeo MP4, MOV, WebM, AVI ou MKV.");
       return;
     }
-    if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) {
+    if (ehImagem && arquivo.size > TAMANHO_MAXIMO_ARQUIVO) {
       setErro("A foto tem mais de 30 MB. Envie uma versão menor.");
       return;
     }
+    if (ehVideo && arquivo.size > TAMANHO_MAXIMO_VIDEO) {
+      setErro("O vídeo tem mais de 100 MB. Envie uma versão menor.");
+      return;
+    }
 
-    setPreparandoImagem(true);
+    setPreparandoMidia(true);
     try {
-      setImagem(await prepararImagem(arquivo));
+      const preparada: Midia = ehVideo
+        ? { tipo: "video", ...(await prepararVideo(arquivo)) }
+        : { tipo: "imagem", ...(await prepararImagem(arquivo)) };
+      setMidia(preparada);
       setNomeArquivo(arquivo.name);
+      setTamanhoArquivo(arquivo.size);
     } catch (falha) {
-      setErro(falha instanceof Error ? falha.message : "Não foi possível abrir esta imagem.");
+      setErro(falha instanceof Error ? falha.message : "Não foi possível abrir este arquivo.");
     } finally {
-      setPreparandoImagem(false);
+      setPreparandoMidia(false);
       if (inputArquivo.current) inputArquivo.current.value = "";
     }
   }
@@ -111,46 +155,103 @@ export function EnvioForm() {
     void selecionarArquivo(evento.dataTransfer.files[0]);
   }
 
+  async function enviarImagem(corpo: Record<string, unknown>) {
+    const resposta = await fetch("/api/enviar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+    const dados = await lerResposta(resposta);
+    if (!resposta.ok || !dados?.protocolo) {
+      throw new Error(dados?.erro ?? "Não foi possível enviar agora. Tente novamente em alguns minutos.");
+    }
+    return dados.protocolo;
+  }
+
+  async function enviarVideo(corpo: Record<string, unknown>, video: VideoPreparado) {
+    const inicio = await fetch("/api/enviar/video?acao=iniciar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+    const dadosInicio = await lerResposta(inicio);
+    if (!inicio.ok || !dadosInicio?.protocolo) {
+      throw new Error(dadosInicio?.erro ?? "Não foi possível iniciar o envio do vídeo.");
+    }
+
+    const protocolo = dadosInicio.protocolo;
+    const total = video.arquivo.size;
+    let concluido = false;
+    for (let posicao = 0; posicao < total; posicao += TAMANHO_PARTE_VIDEO) {
+      const fimExclusivo = Math.min(posicao + TAMANHO_PARTE_VIDEO, total);
+      const parte = video.arquivo.slice(posicao, fimExclusivo);
+      const parametros = new URLSearchParams({
+        acao: "parte",
+        protocolo,
+        inicio: String(posicao),
+        fim: String(fimExclusivo - 1),
+        total: String(total),
+      });
+      const resposta = await fetch(`/api/enviar/video?${parametros}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: parte,
+      });
+      const dados = await lerResposta(resposta);
+      if (!resposta.ok) throw new Error(dados?.erro ?? "O envio do vídeo foi interrompido.");
+      concluido = dados?.concluido === true;
+      setProgressoEnvio(Math.round((fimExclusivo / total) * 100));
+    }
+
+    if (!concluido) throw new Error("Não foi possível concluir o envio do vídeo.");
+    return protocolo;
+  }
+
   async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setErro("");
 
-    if (!imagem) {
-      setErro("Selecione a foto que você quer analisar.");
+    if (!midia) {
+      setErro("Selecione a foto ou o vídeo que você quer analisar.");
       return;
     }
 
-    const corpo = {
+    const dadosComuns = {
       ...campos,
       instagram: normalizarInstagram(campos.instagram),
       autorizaAnalise,
       autorizaPublicacao,
-      imagemBase64: imagem.base64,
-      largura: imagem.largura,
-      altura: imagem.altura,
     };
+    const corpo =
+      midia.tipo === "imagem"
+        ? {
+            ...dadosComuns,
+            imagemBase64: midia.base64,
+            largura: midia.largura,
+            altura: midia.altura,
+          }
+        : {
+            ...dadosComuns,
+            nomeArquivo,
+            tamanho: midia.arquivo.size,
+          };
 
-    const validacao = validarPedido(corpo);
+    const validacao = midia.tipo === "imagem" ? validarPedido(corpo) : validarPedidoVideo(corpo);
     if (!validacao.ok) {
       setErro(validacao.erro);
       return;
     }
 
     setEtapa({ tipo: "enviando" });
+    setProgressoEnvio(midia.tipo === "video" ? 1 : 0);
     try {
-      const resposta = await fetch("/api/enviar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(corpo),
-      });
-      const dados = (await resposta.json().catch(() => null)) as { protocolo?: string; erro?: string } | null;
-      if (!resposta.ok || !dados?.protocolo) {
-        throw new Error(dados?.erro ?? "Não foi possível enviar agora. Tente novamente em alguns minutos.");
-      }
-      setEtapa({ tipo: "enviado", protocolo: dados.protocolo });
+      const protocolo =
+        midia.tipo === "imagem" ? await enviarImagem(corpo) : await enviarVideo(corpo, midia);
+      setEtapa({ tipo: "enviado", protocolo });
     } catch (falha) {
       setErro(falha instanceof Error ? falha.message : "Não foi possível enviar agora.");
       setEtapa({ tipo: "preenchendo" });
+      setProgressoEnvio(0);
     }
   }
 
@@ -158,8 +259,10 @@ export function EnvioForm() {
     setCampos((atuais) => ({ ...camposVazios, nome: atuais.nome, email: atuais.email, instagram: atuais.instagram }));
     setAutorizaAnalise(false);
     setAutorizaPublicacao(false);
-    setImagem(null);
+    setMidia(null);
     setNomeArquivo("");
+    setTamanhoArquivo(0);
+    setProgressoEnvio(0);
     setErro("");
     setEtapa({ tipo: "preenchendo" });
   }
@@ -168,21 +271,21 @@ export function EnvioForm() {
     return (
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-emerald-200 bg-white px-6 py-12 text-center shadow-sm">
         <CircleCheck size={56} className="text-emerald-500" />
-        <h3 className="text-2xl font-bold text-slate-900">Recebemos sua foto!</h3>
+        <h3 className="text-2xl font-bold text-slate-900">Recebemos seu arquivo!</h3>
         <p className="text-slate-600">Seu protocolo é</p>
         <p className="rounded-lg bg-slate-100 px-5 py-2 font-mono text-2xl font-bold tracking-wider text-slate-900">
           {etapa.protocolo}
         </p>
         <p className="max-w-md text-sm text-slate-600">
-          Enviamos uma confirmação para <strong>{campos.email}</strong>. O resultado da análise chega
-          nesse e-mail em {site.prazoResposta}. Se não encontrar, confira a caixa de spam.
+          Enviamos uma confirmação para <strong>{campos.email}</strong>. O resultado da análise chega nesse
+          e-mail em {site.prazoResposta}. Se não encontrar, confira a caixa de spam.
         </p>
         <button
           type="button"
           onClick={recomecar}
           className="mt-2 rounded-lg border border-slate-200 px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
-          Enviar outra foto
+          Enviar outro arquivo
         </button>
       </div>
     );
@@ -196,7 +299,7 @@ export function EnvioForm() {
       noValidate
       className="flex flex-col gap-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
     >
-      <Secao titulo="Sua foto" descricao="Uma foto por envio. JPG, PNG ou WebP.">
+      <Secao titulo="Sua foto ou vídeo" descricao="Uma mídia por envio. Fotos até 30 MB e vídeos até 100 MB.">
         <div
           onDragOver={(evento) => {
             evento.preventDefault();
@@ -208,17 +311,33 @@ export function EnvioForm() {
             arrastando ? "border-[#137FEC] bg-[#DCEBFB]" : "border-[#A8CDF4] bg-[#E6EFF8]"
           }`}
         >
-          {imagem ? (
+          {midia ? (
             <div className="flex flex-col items-center gap-4 sm:flex-row">
-              <img
-                src={imagem.previewUrl}
-                alt="Pré-visualização da foto selecionada"
-                className="h-44 w-full rounded-lg object-cover sm:w-64"
-              />
+              {midia.tipo === "imagem" ? (
+                <img
+                  src={midia.previewUrl}
+                  alt="Pré-visualização da foto selecionada"
+                  className="h-44 w-full rounded-lg bg-slate-900 object-cover sm:w-64"
+                />
+              ) : midia.previewDisponivel ? (
+                <video
+                  src={midia.previewUrl}
+                  aria-label="Pré-visualização do vídeo selecionado"
+                  controls
+                  muted
+                  playsInline
+                  className="h-44 w-full rounded-lg bg-slate-950 object-contain sm:w-64"
+                />
+              ) : (
+                <div className="flex h-44 w-full items-center justify-center rounded-lg bg-slate-900 text-white sm:w-64">
+                  <FileVideo size={46} />
+                </div>
+              )}
               <div className="flex min-w-0 flex-1 flex-col items-center gap-2 sm:items-start">
                 <p className="max-w-full truncate font-medium text-slate-800">{nomeArquivo}</p>
                 <p className="text-sm text-slate-500">
-                  {imagem.largura} × {imagem.altura} px
+                  {midia.tipo === "imagem" ? `${midia.largura} × ${midia.altura} px · ` : ""}
+                  {tamanhoLegivel(tamanhoArquivo)}
                 </p>
                 <button
                   type="button"
@@ -227,26 +346,26 @@ export function EnvioForm() {
                   className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   <RefreshCw size={16} />
-                  Trocar foto
+                  Trocar arquivo
                 </button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#137FEC]">
-                {preparandoImagem ? <LoaderCircle size={26} className="animate-spin" /> : <ImagePlus size={26} />}
+                {preparandoMidia ? <LoaderCircle size={26} className="animate-spin" /> : <FileUp size={26} />}
               </div>
               <p className="text-lg font-semibold text-slate-700">
-                {preparandoImagem ? "Preparando a foto..." : "Arraste a foto para cá"}
+                {preparandoMidia ? "Preparando o arquivo..." : "Arraste a foto ou o vídeo para cá"}
               </p>
-              <p className="text-sm text-slate-500">ou</p>
+              <p className="text-sm text-slate-500">JPG, PNG, WebP, MP4, MOV, WebM, AVI ou MKV</p>
               <button
                 type="button"
                 onClick={() => inputArquivo.current?.click()}
-                disabled={preparandoImagem}
+                disabled={preparandoMidia}
                 className="rounded-lg bg-[#137FEC] px-8 py-2 font-medium text-white hover:bg-[#0F6FD1] disabled:opacity-50"
               >
-                Escolher foto
+                Escolher arquivo
               </button>
             </div>
           )}
@@ -254,7 +373,7 @@ export function EnvioForm() {
           <input
             ref={inputArquivo}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska,.avi,.mkv"
             className="hidden"
             onChange={(evento) => void selecionarArquivo(evento.target.files?.[0])}
           />
@@ -286,7 +405,7 @@ export function EnvioForm() {
               className={classeInput}
             />
           </Campo>
-          <Campo rotulo="Instagram" dica="Para darmos o crédito, se a foto for publicada.">
+          <Campo rotulo="Instagram" dica="Para darmos o crédito, se o trabalho for publicado.">
             <input
               type="text"
               autoComplete="off"
@@ -342,7 +461,7 @@ export function EnvioForm() {
               className="mt-0.5 h-4 w-4 accent-[#137FEC]"
             />
             <span>
-              Sou autor da foto ou tenho direito de usá-la, e autorizo o {site.nome} a analisá-la.
+              Sou autor da foto ou do vídeo, ou tenho direito de usá-lo, e autorizo o {site.nome} a analisá-lo.
               <span className="text-[#137FEC]"> *</span>
             </span>
           </label>
@@ -354,8 +473,8 @@ export function EnvioForm() {
               className="mt-0.5 h-4 w-4 accent-[#137FEC]"
             />
             <span>
-              Autorizo a publicação da foto e do resultado no Instagram{" "}
-              <strong>@{site.instagram}</strong>. (Opcional)
+              Autorizo a publicação do arquivo e do resultado no Instagram <strong>@{site.instagram}</strong>.
+              (Opcional)
             </span>
           </label>
         </div>
@@ -374,6 +493,19 @@ export function EnvioForm() {
         </label>
       </div>
 
+      {enviando && midia?.tipo === "video" ? (
+        <div className="rounded-lg bg-[#E6EFF8] px-4 py-3" aria-live="polite">
+          <div className="flex items-center justify-between text-sm font-medium text-[#0F6FD1]">
+            <span>Enviando vídeo</span>
+            <span>{progressoEnvio}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+            <div className="h-full rounded-full bg-[#137FEC] transition-[width]" style={{ width: `${progressoEnvio}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-slate-600">Mantenha esta página aberta até o envio terminar.</p>
+        </div>
+      ) : null}
+
       {erro ? (
         <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <CircleAlert size={18} className="mt-0.5 shrink-0" />
@@ -391,7 +523,7 @@ export function EnvioForm() {
         </p>
         <button
           type="submit"
-          disabled={enviando || preparandoImagem}
+          disabled={enviando || preparandoMidia}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#137FEC] px-8 py-3 font-semibold text-white hover:bg-[#0F6FD1] disabled:opacity-60 sm:w-auto"
         >
           {enviando ? <LoaderCircle size={18} className="animate-spin" /> : <Send size={18} />}

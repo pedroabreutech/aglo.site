@@ -26,7 +26,7 @@ export function SiteHeader() {
             href="/#enviar"
             className="rounded-lg bg-[#137FEC] px-4 py-2 font-medium text-white hover:bg-[#0F6FD1]"
           >
-            Enviar foto
+            Enviar arquivo
           </Link>
         </nav>
       </div>

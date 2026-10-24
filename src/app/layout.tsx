@@ -5,14 +5,14 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 const descricao =
-  "Envie uma foto de multidão e receba no seu e-mail a contagem estimada de pessoas, feita com inteligência artificial. Gratuito.";
+  "Envie uma foto ou vídeo de multidão e receba no seu e-mail a contagem estimada de pessoas, feita com inteligência artificial. Gratuito.";
 
 export const metadata: Metadata = {
   title: "Aglo | Contagem de multidões com IA",
   description: descricao,
   icons: { icon: "/favicon.svg" },
   openGraph: {
-    title: "Aglo | Quantas pessoas tem na sua foto?",
+    title: "Aglo | Contagem de pessoas em fotos e vídeos",
     description: descricao,
     locale: "pt_BR",
     type: "website",

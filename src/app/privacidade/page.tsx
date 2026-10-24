@@ -36,8 +36,8 @@ export default function Privacidade() {
               <li>Nome e usuário do Instagram, se você informar.</li>
               <li>Nome, data e local do evento, se você informar.</li>
               <li>
-                A foto enviada. Antes do envio, o próprio navegador reduz a imagem e remove os
-                metadados do arquivo, como a localização GPS.
+                A foto ou o vídeo enviado. Fotos são reduzidas no próprio navegador e têm os
+                metadados removidos, como a localização GPS. Vídeos são enviados no formato original.
               </li>
             </ul>
           </section>
@@ -46,7 +46,7 @@ export default function Privacidade() {
             <h2>Como usamos</h2>
             <ul>
               <li>
-                A foto é analisada pela equipe {site.nome} com um modelo de inteligência artificial
+                O arquivo é analisado pela equipe {site.nome} com um modelo de inteligência artificial
                 de contagem de multidões, e o resultado é enviado para o seu e-mail.
               </li>
               <li>Não vendemos nem compartilhamos seus dados com terceiros.</li>
@@ -57,7 +57,7 @@ export default function Privacidade() {
           <section>
             <h2>Publicação no Instagram</h2>
             <p className="mt-2">
-              A foto e o resultado só são publicados em @{site.instagram} se você marcar a
+              O arquivo e o resultado só são publicados em @{site.instagram} se você marcar a
               autorização no formulário. Antes de publicar, rostos nítidos são desfocados e fotos
               com crianças em destaque não são publicadas. Você pode pedir a remoção de uma
               publicação a qualquer momento.
@@ -67,7 +67,7 @@ export default function Privacidade() {
           <section>
             <h2>Por quanto tempo guardamos</h2>
             <p className="mt-2">
-              A foto é apagada em até {site.diasRetencaoFoto} dias após o envio do resultado. O
+              A foto ou o vídeo é apagado em até {site.diasRetencaoFoto} dias após o envio do resultado. O
               registro do pedido (protocolo, e-mail e contagem) é mantido para controle interno.
             </p>
           </section>
@@ -85,7 +85,7 @@ export default function Privacidade() {
             <h2>Sobre as contagens</h2>
             <p className="mt-2">
               Os números são estimativas feitas por inteligência artificial e podem variar conforme
-              o ângulo, a resolução e as pessoas encobertas na foto. Eles não devem ser usados como
+              o ângulo, a resolução e as pessoas encobertas na foto ou no vídeo. Eles não devem ser usados como
               contagem oficial.
             </p>
           </section>

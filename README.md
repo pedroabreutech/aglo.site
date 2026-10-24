@@ -1,17 +1,18 @@
 # Aglo — Página de envio
 
-Site público onde qualquer pessoa envia uma foto de multidão para ser analisada.
-Os pedidos chegam numa planilha do Google e as fotos numa pasta do Google Drive;
+Site público onde qualquer pessoa envia uma foto ou vídeo de multidão para ser analisado.
+Os pedidos chegam numa planilha do Google e os arquivos numa pasta do Google Drive;
 a análise é feita no Aglo local e o resultado é respondido por e-mail.
 
 ```
 Navegador ──► Vercel (Next.js, /api/enviar) ──► Google Apps Script ──► Drive + Planilha + Gmail
 ```
 
-- O navegador reduz a foto para no máximo 2048 px e remove os metadados (EXIF/GPS).
+- O navegador reduz fotos para no máximo 2048 px e remove os metadados (EXIF/GPS).
+- Vídeos MP4, MOV, WebM, AVI ou MKV de até 100 MB são enviados em partes e salvos diretamente no Drive.
 - A rota `/api/enviar` valida os dados e repassa ao Apps Script com um segredo, então
   ninguém consegue gravar na planilha sem passar pelo site.
-- O Apps Script salva a foto em `Aglo/Recebidas/AGL-0001.jpg`, registra a linha na
+- O Apps Script salva o arquivo como `Aglo/Recebidas/AGL-0001.<formato>`, registra a linha na
   planilha "Aglo – Pedidos" e envia a confirmação ao usuário e um aviso a você.
 
 ## 1. Google Apps Script
@@ -24,7 +25,8 @@ Navegador ──► Vercel (Next.js, /api/enviar) ──► Google Apps Script �
 5. Selecione a função `configurar` e clique em **Executar**. Autorize o acesso ao Drive,
    Planilhas e Gmail. O log mostra o segredo, o link da planilha e o da pasta.
 6. **Implantar → Nova implantação → Aplicativo da Web**, com "Executar como: Eu" e
-   "Quem pode acessar: Qualquer pessoa". Copie a URL que termina em `/exec`.
+   "Quem pode acessar: Qualquer pessoa". Copie a URL que termina em `/exec`. Ao atualizar o
+   `Code.gs`, publique uma nova versão da implantação para habilitar o envio de vídeos.
 
 Para ver o segredo de novo, execute `mostrarConfiguracao`. Depois de alterar o
 `Code.gs`, publique em **Implantar → Gerenciar implantações → Editar → Nova versão**
@@ -48,7 +50,7 @@ ajuste `INSTAGRAM` e `PRAZO_RESPOSTA` no topo do `Code.gs` para ficarem iguais a
 ## 3. No seu Mac
 
 Instale o [Google Drive para computador](https://www.google.com/drive/download/) com a
-conta do projeto: a pasta `Aglo/Recebidas` aparece no Finder e as fotos chegam sozinhas.
+conta do projeto: a pasta `Aglo/Recebidas` aparece no Finder e os arquivos chegam sozinhos.
 Analise no Aglo local, responda pelo Gmail e atualize o status na planilha.
 
 ## Rodando localmente
